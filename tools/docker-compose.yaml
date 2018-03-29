@@ -1,0 +1,66 @@
+# Copyright IBM Corp. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+
+version: '2'
+
+services:
+  couchdb0:
+    container_name: couchdb0
+    image: hyperledger/fabric-couchdb:x86_64-1.0.3
+    # Comment/Uncomment the port mapping if you want to hide/expose the CouchDB service,
+    # for example map it to utilize Fauxton User Interface in dev environments.
+    ports:
+      - "5984:5984"
+
+  ca0:
+    image: hyperledger/fabric-ca:x86_64-1.1.0
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-org1
+      - FABRIC_CA_SERVER_TLS_ENABLED=false
+      - FABRIC_CA_SERVER_TLS_CERTFILE=/etc/hyperledger/fabric-ca-server-config/ca.org1.example.com-cert.pem
+      - FABRIC_CA_SERVER_TLS_KEYFILE=/etc/hyperledger/fabric-ca-server-config/ecdfb3065b365c9b74575899b37f9481649240f24abf028f59694488cbba741a_sk
+    ports:
+      - "7054:7054"
+    command: sh -c 'fabric-ca-server start --ca.certfile /etc/hyperledger/fabric-ca-server-config/ca.org1.example.com-cert.pem --ca.keyfile /etc/hyperledger/fabric-ca-server-config/331ea92870950f6c47355da129b919f7851c3a934153302f7e4ad335d24649f8_sk -b admin:adminpw -d'
+    volumes:
+      - ./crypto-config/peerOrganizations/org1.example.com/ca/:/etc/hyperledger/fabric-ca-server-config
+    container_name: ca_peerOrg1
+
+  orderer.example.com:
+    extends:
+      file:   base/docker-compose-base.yaml
+      service: orderer.example.com
+    container_name: orderer.example.com
+
+  peer0.org1.example.com:
+    container_name: peer0.org1.example.com
+    extends:
+      file:  base/docker-compose-base.yaml
+      service: peer0.org1.example.com
+    depends_on:
+      - couchdb0
+  
+  cli:
+      container_name: cli
+      image: hyperledger/fabric-tools:x86_64-1.1.0
+      tty: true
+      environment:
+        - GOPATH=/opt/gopath
+        - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+        - CORE_LOGGING_LEVEL=DEBUG
+        - CORE_PEER_ID=cli
+        - CORE_PEER_ADDRESS=peer0.org1.example.com:7051
+        - CORE_PEER_LOCALMSPID=Org1MSP
+        - CORE_PEER_TLS_ENABLED=false
+        - CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+      working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+      volumes:
+          - /var/run/:/host/var/run/
+          - /home/ubuntu/fabric_chaincode/go:/opt/gopath/src/github.com/hyperledger/fabric/examples/chaincode/go
+          - ./crypto-config:/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/
+          - ./channel-artifacts:/opt/gopath/src/github.com/hyperledger/fabric/peer/
+      depends_on:
+        - orderer.example.com
+        - peer0.org1.example.com
