@@ -174,6 +174,7 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 				return shim.Error(fmt.Sprintf("query operation failed. Error accessing state: %s", err))
 			}
 			keys = append(keys, response.TxId)
+			//keys = append(keys, string(response.Value))   //return Value
 		}
 
 		for key, txID := range keys {
